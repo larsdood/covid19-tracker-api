@@ -2,10 +2,12 @@
   "name": "covid19-tracker-api",
   "version": "0.0.1",
   "description": "a server that exposes an api for pomber/covid19 timeseries",
-  "main": "server.ts",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "ts-node server.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prestart": "tsc",
+    "start": "node dist/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublish": "tsc"
   },
   "author": "Lars Holdaas",
   "license": "ISC",
@@ -20,9 +22,9 @@
     "node-fetch": "^2.6.0",
     "proxjs": "0.0.5",
     "rxjs": "^6.5.5",
-    "ts-node": "^8.8.2"
+    "typescript": "^3.8.3"
   },
   "devDependencies": {
-    "typescript": "^3.8.3"
+    "ts-node": "^8.8.2"
   }
 }
