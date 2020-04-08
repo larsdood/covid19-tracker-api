@@ -2,6 +2,7 @@ import express = require('express')
 const ExpressCache = require('express-cache-middleware');
 const cacheManager = require('cache-manager');
 const fs = require('fs');
+const expressSwagger = require('express-swagger-generator')(app)
 import moment from 'moment';
 import { Observable } from 'rxjs';
 import { select } from 'proxjs';
@@ -9,6 +10,7 @@ import { Store } from './store';
 import { select$ } from './select$';
 require ('dotenv').config();
 import { timeseriesDateRegex } from './regex';
+import { makeSwaggerOptions } from './make-swagger-options';
 
 interface TimeseriesEntry {
   date: string;
@@ -54,6 +56,8 @@ if (process.env.PRODUCTION === 'true' || true) {
 
   console.log('this is dev!')
 }
+
+expressSwagger(makeSwaggerOptions());
 
 const latest$: Observable<SpecificDateSeries> = select$(
   timeseries$,
@@ -123,18 +127,28 @@ cacheMiddleware.attach(app);
 
 app.use(express.json());
 
-app.get('', (req: express.Request, res: express.Response) => {
-  res.send('SWAGGER HERE PLS')
+app.get('', (_req: express.Request, res: express.Response) => {
+  res.redirect('/api-docs')
 });
 
 /**
  * returns latest data for each country in the list
+ * @route GET /latest
+ * @returns {object} 200 - a dict with the latest stat for each country
+ * @returns {Error} default - Unexpected error
  */
 app.get('/latest', (_req: express.Request, res: express.Response) => {
   const latest = select(latest$);
   return res.send(latest);
 });
 
+/**
+ * returns latest data for a specific country
+ * @route GET /latest/:country
+ * @param {string} country.query.required the name of the country
+ * @returns {object} 200 - an object with infected, deaths and recovered for that country
+ * @returns {Error} default - Unexpected error
+ */
 app.get('/latest/:country', (req: express.Request, res: express.Response) => {
   const country: string = req.params.country;
   if (!country) {
@@ -149,7 +163,6 @@ app.get('/latest/:country', (req: express.Request, res: express.Response) => {
       error: "could not find country " + country
     });
   }
-  // const latest: TimeseriesEntry = countryData[countryData.length - 1];
   if (!latest) {
     return res.status(404).send({
       error: "could not find latest data for " + country
@@ -162,7 +175,13 @@ app.get('/latest/:country', (req: express.Request, res: express.Response) => {
   });
 });
 
-app.get('/date/:date', (req: express.Request, res: express.Response) => {
+/**
+ * return all countries data for the specific date
+ * @route GET /date/:date
+ * @param {string} date.query.required the specified date (string of format YYYY-MM-DD)
+ * @returns {object} 200 - a dict with stats on each country on the specific date
+ * @returns {Error} default - Unexpected error
+ */
   let { date } = req.params;
   if (!timeseriesDateRegex.test(date)) {
     return res.status(403).send({
@@ -176,7 +195,12 @@ app.get('/date/:date', (req: express.Request, res: express.Response) => {
   res.send(onDate);
 });
 
-app.get('/accumulated', (req: express.Request, res: express.Response) => {
+/**
+ * return all countries data for the specific date
+ * @route GET /accumulated
+ * @returns {object} 200 - an object with accumulated infections, deaths, recovered on the latest date
+ * @returns {Error} default - Unexpected error
+ */
   const accumulated = select(accumulated$);
   const latestDateInCollection = select(latestDateInCollection$);
   return res.send({
@@ -185,16 +209,13 @@ app.get('/accumulated', (req: express.Request, res: express.Response) => {
     ...accumulated });
 });
 
-app.get('/accumulated/:date', (req: express.Request, res: express.Response) => {
-  let { date } = req.params;
-  if (!timeseriesDateRegex.test(date)) {
-    return res.status(403).send({
-      error: 'date must be on format YYYY-MM-DD'
-    })
-  };
-  // in case requests put a 0 in front of day or month which is not in dataset
-  // we want to allow this.
-  date = date.replace('-0', '-');
+/**
+ * return all countries data for the specific date
+ * @route GET /accumulated/:date
+ * @param {string} date.query.required the specified date (string of format YYYY-MM-DD)
+ * @returns {object} 200 - an object with accumulated infections, deaths, recovered on the specified date
+ * @returns {Error} default - Unexpected error
+ */
   const accumulatedOnDate = select(accumulatedOnDate$(date));
   return res.send(
     {

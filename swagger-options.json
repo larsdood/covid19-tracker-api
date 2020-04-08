@@ -1,0 +1,8 @@
+{
+  "swaggerDefinition": {
+    "info": {
+    }
+  },
+  "basedir": "",
+  "files": ["./server.ts"]
+}
