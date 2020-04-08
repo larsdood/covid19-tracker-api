@@ -49,7 +49,7 @@ const updateTimeseries = async () => {
       timeseries$.next(json)
       lastDataFetch = Date.now();
     });
-    }
+}
 
 if (process.env.PRODUCTION === 'true') {
   timeseries$ = new Store({} as Timeseries);
@@ -120,7 +120,6 @@ const latestDateInCollection$: Observable<string> = select$(
   ).format('YYYY-MM-DD')
 );
 
-const app = express();
 
 const cacheMiddleware = new ExpressCache(
   cacheManager.caching({
@@ -146,6 +145,21 @@ const fetchNewDataMiddleware = async (_req: express.Request, _res: express.Respo
   next();
 }
 app.use(fetchNewDataMiddleware);
+
+const dateParamCheckerMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  let { date } = req.params;
+  if (!timeseriesDateRegex.test(date)) {
+    return res.status(403).send({
+      error: 'date must be on format YYYY-MM-DD'
+    })
+  };
+  // in case requests put a 0 in front of day or month which is not in dataset
+  // we want to allow this.
+  date = date.replace('-0', '-');
+  req.params.date = date;
+  next();
+}
+
 app.use(express.json());
 
 app.get('', (_req: express.Request, res: express.Response) => {
@@ -203,15 +217,8 @@ app.get('/latest/:country', (req: express.Request, res: express.Response) => {
  * @returns {object} 200 - a dict with stats on each country on the specific date
  * @returns {Error} default - Unexpected error
  */
+app.get('/date/:date', [dateParamCheckerMiddleware], (req: express.Request, res: express.Response) => {
   let { date } = req.params;
-  if (!timeseriesDateRegex.test(date)) {
-    return res.status(403).send({
-      error: 'date must be on format YYYY-MM-DD'
-    })
-  };
-  // in case requests put a 0 in front of day or month which is not in dataset
-  // we want to allow this.
-  date = date.replace('-0', '-');
   const onDate = select(onDate$(date));
   res.send(onDate);
 });
@@ -222,6 +229,7 @@ app.get('/latest/:country', (req: express.Request, res: express.Response) => {
  * @returns {object} 200 - an object with accumulated infections, deaths, recovered on the latest date
  * @returns {Error} default - Unexpected error
  */
+app.get('/accumulated', (_req: express.Request, res: express.Response) => {
   const accumulated = select(accumulated$);
   const latestDateInCollection = select(latestDateInCollection$);
   return res.send({
@@ -237,6 +245,8 @@ app.get('/latest/:country', (req: express.Request, res: express.Response) => {
  * @returns {object} 200 - an object with accumulated infections, deaths, recovered on the specified date
  * @returns {Error} default - Unexpected error
  */
+app.get('/accumulated/:date', [dateParamCheckerMiddleware], (req: express.Request, res: express.Response) => {
+  const { date } = req.params;
   const accumulatedOnDate = select(accumulatedOnDate$(date));
   return res.send(
     {
