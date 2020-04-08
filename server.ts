@@ -1,16 +1,23 @@
 import express = require('express')
+
+const app = express();
+
+require ('dotenv').config();
 const ExpressCache = require('express-cache-middleware');
+const fetch = require('node-fetch');
 const cacheManager = require('cache-manager');
 const fs = require('fs');
 const expressSwagger = require('express-swagger-generator')(app)
 import moment from 'moment';
 import { Observable } from 'rxjs';
+
 import { select } from 'proxjs';
 import { Store } from './store';
 import { select$ } from './select$';
-require ('dotenv').config();
 import { timeseriesDateRegex } from './regex';
 import { makeSwaggerOptions } from './make-swagger-options';
+
+let lastDataFetch: number;
 
 interface TimeseriesEntry {
   date: string;
@@ -35,26 +42,24 @@ interface SpecificDateSeries {
 
 let timeseries$: Store<Timeseries>;
 
-if (process.env.PRODUCTION === 'true' || true) {
-  const fetch = require('node-fetch');
-  timeseries$ = new Store({} as Timeseries);
-  const options = {
-    url: 'https://pomber.github.io/covid19/timeseries.json',
-    method: 'GET',
-    headers: {
-      'Accept': 'application/json'
+const updateTimeseries = async () => {
+  await fetch('https://pomber.github.io/covid19/timeseries.json')
+    .then((res: any) => res.json())
+    .then((json: Timeseries) => {
+      timeseries$.next(json)
+      lastDataFetch = Date.now();
+    });
     }
-  }
-  fetch('https://pomber.github.io/covid19/timeseries.json')
-    .then((res: any) => res.json)
-    .then((json: Timeseries) => timeseries$.next(json));
 
+if (process.env.PRODUCTION === 'true') {
+  timeseries$ = new Store({} as Timeseries);
+  updateTimeseries();
 } else {
   const rawdata = fs.readFileSync('./static/timeseries_2020-APR-07.json');
   const timeseries: Timeseries = JSON.parse(rawdata);
   timeseries$ = new Store(timeseries);
 
-  console.log('this is dev!')
+  console.log('Dev mode: Loaded static backup timeseries JSON')
 }
 
 expressSwagger(makeSwaggerOptions());
@@ -125,6 +130,22 @@ const cacheMiddleware = new ExpressCache(
 
 cacheMiddleware.attach(app);
 
+const fetchNewDataMiddleware = async (_req: express.Request, _res: express.Response, next: express.NextFunction) => {
+  if (Date.now() - lastDataFetch >= 600000) {
+    console.log('updating timeseries at ', Date.now());
+    let temp = lastDataFetch;
+    //disable multiple calls at same time
+    lastDataFetch = Date.now();
+    try {
+      await updateTimeseries()
+      
+    }catch (e) {
+      lastDataFetch = temp;
+    }
+  }
+  next();
+}
+app.use(fetchNewDataMiddleware);
 app.use(express.json());
 
 app.get('', (_req: express.Request, res: express.Response) => {
