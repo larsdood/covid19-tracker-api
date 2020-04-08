@@ -247,6 +247,15 @@ app.get('/latest/:country', (req: express.Request, res: express.Response) => {
   );
 });
 
+/**
+ * returns timeseries.json which is the data source used
+ * @route GET /timeseries
+ * @returns {object} 200 - the complete dataset
+ */
+app.get('/timeseries', (_req: express.Request, res: express.Response) => {
+  return res.send(timeseries$.getValue());
+})
+
 const PORT = process.env.PORT || 4000;
 
 app.listen(PORT, () => {
