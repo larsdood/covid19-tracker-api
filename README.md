@@ -9,9 +9,4 @@ Instead, I found a repository that maintains an updated JSON file with stats.
 So I wrote an express API to expose this.
 
 @@ TODO:
-
-Host it
-
-Implement automatic restart when pomber/covid19 updates
-
-Extend API
+Handling of country names. maybe need a dict for country codes etc? right now the JSON object has country names in a specific format that is not very helpful for devs
