@@ -20,7 +20,7 @@
     "express-cache-middleware": "^1.0.1",
     "express-swagger-generator": "^1.1.17",
     "moment": "^2.24.0",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.1",
     "proxjs": "0.0.5",
     "rxjs": "^6.5.5",
     "typescript": "^3.8.3"
